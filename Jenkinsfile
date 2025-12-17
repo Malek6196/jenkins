@@ -182,20 +182,22 @@ pipeline {
                         echo "=== Déploiement Spring Boot ==="
                         export KUBECONFIG=/var/lib/jenkins/.kube/config
 
-                        # Mettre à jour l'image dans le YAML
-                        sed -i 's|image:.*malekbs/student-management.*|image: ${env.DOCKER_IMAGE}:${env.DOCKER_TAG}|g' spring-deployment.yaml
+                        # Vérifier si le deployment existe déjà
+                        if kubectl get deployment spring-app -n \${K8S_NAMESPACE} >/dev/null 2>&1; then
+                            echo "📦 Deployment existant détecté - mise à jour de l'image..."
+                            kubectl set image deployment/spring-app spring-app=\${DOCKER_IMAGE}:\${DOCKER_TAG} -n \${K8S_NAMESPACE} --record
+                        else
+                            echo "🆕 Nouveau déploiement..."
+                            # Modifier l'image dans le YAML pour le premier déploiement
+                            sed -i "s|image:.*malekbs/student-management.*|image: \${DOCKER_IMAGE}:\${DOCKER_TAG}|g" spring-deployment.yaml
+                            kubectl apply -f spring-deployment.yaml -n \${K8S_NAMESPACE}
+                        fi
 
-                        # Déployer
-                        kubectl apply -f spring-deployment.yaml -n ${env.K8S_NAMESPACE}
+                        # Attendre le rollout
+                        echo "⏳ Attente du déploiement..."
+                        kubectl rollout status deployment/spring-app -n \${K8S_NAMESPACE} --timeout=300s
 
-                        echo "Attente démarrage Spring Boot..."
-                        sleep 20
-
-                        # Vérifier
-                        echo "Pods Spring Boot:"
-                        kubectl get pods -l app=spring-boot-app -n ${env.K8S_NAMESPACE} --watch --timeout=30s || true
-
-                        echo "✅ Spring Boot déployé"
+                        echo "✅ Spring Boot déployé avec l'image: \${DOCKER_IMAGE}:\${DOCKER_TAG}"
                     """
                 }
             }
@@ -217,7 +219,7 @@ pipeline {
 
                         echo ""
                         echo "3. Vérification Spring Boot:"
-                        SPRING_POD=$(kubectl get pods -l app=spring-boot-app -n ${K8S_NAMESPACE} -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+                        SPRING_POD=$(kubectl get pods -l app=spring-app -n ${K8S_NAMESPACE} -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
                         if [ -n "$SPRING_POD" ]; then
                             echo "Pod Spring Boot: $SPRING_POD"
