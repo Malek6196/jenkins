@@ -54,3 +54,8 @@ data:
           # Cette règle définit l'instance sur le nom du nœud
           - source_labels: [__meta_kubernetes_node_name]
             target_label: instance
+            
+      # Kube State Metrics (Kubernetes Object State)  <-- NOUVEAU JOB
+      - job_name: 'kube-state-metrics'
+        static_configs:
+          - targets: ['kube-state-metrics.devops.svc.cluster.local:8080']
