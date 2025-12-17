@@ -33,3 +33,24 @@ data:
           - targets: ['localhost:9090']
             labels:
               job: 'prometheus'
+              
+      # Kubernetes cAdvisor (Container Metrics) - CORRIGÉ
+      - job_name: 'kubernetes-cadvisor'
+        kubernetes_sd_configs:
+          - role: node
+        scheme: https
+        tls_config:
+          insecure_skip_verify: true  # Gardez cette ligne pour ignorer les erreurs de certificat
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          # Cette règle conserve l'adresse __address__ comme l'hôte:port du nœud
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+          # Cette règle définit le chemin des métriques sur /metrics/cadvisor
+          - source_labels: [__address__]
+            regex: (.+)
+            target_label: __metrics_path__
+            replacement: /metrics/cadvisor
+          # Cette règle définit l'instance sur le nom du nœud
+          - source_labels: [__meta_kubernetes_node_name]
+            target_label: instance
